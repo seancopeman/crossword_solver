@@ -11,7 +11,7 @@ import {
   wordNumberAt,
 } from "../lib/grid";
 import { clearProgress, loadProgress, saveProgress } from "../lib/progress";
-import type { Direction, ExportedPuzzle } from "../types";
+import { resolveGameplay, type Direction, type ExportedPuzzle } from "../types";
 import Complete from "./Complete";
 import Grid from "./Grid";
 import Keyboard from "./Keyboard";
@@ -95,12 +95,21 @@ export default function Player() {
     ];
   }, [puzzle]);
 
-  // --- timer ---
+  // --- gameplay flags (back-compat defaults when absent) ---
+  const gp = useMemo(
+    () =>
+      puzzle
+        ? resolveGameplay(puzzle)
+        : { timer: true, check: true, reveal: true, linkedClues: true },
+    [puzzle]
+  );
+
+  // --- timer (only when this puzzle enables it) ---
   useEffect(() => {
-    if (paused || completed || !puzzle) return;
+    if (paused || completed || !puzzle || !gp.timer) return;
     const t = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(t);
-  }, [paused, completed, puzzle]);
+  }, [paused, completed, puzzle, gp.timer]);
 
   // Pause when the tab is hidden.
   useEffect(() => {
@@ -350,6 +359,9 @@ export default function Player() {
         <Toolbar
           elapsed={elapsed}
           paused={paused}
+          showTimer={gp.timer}
+          showCheck={gp.check}
+          showReveal={gp.reveal}
           onTogglePause={() => setPaused((p) => !p)}
           onCheck={doCheck}
           onReveal={doReveal}
@@ -374,6 +386,7 @@ export default function Player() {
             marks={marks}
             selected={selected}
             wordKeys={wordKeys}
+            showNumbers={puzzle.showClueNumbers !== false}
             onSelect={selectCell}
           />
         </div>
@@ -387,7 +400,7 @@ export default function Player() {
           <div className="clue-label">{active ? clueLabel(active.num, active.dir) : ""}</div>
           <div className="clue-text">
             {clueText}
-            {linked && linked.length > 0 && (
+            {gp.linkedClues && linked && linked.length > 0 && (
               <span className="linked"> (with {linked.join(", ")})</span>
             )}
           </div>
@@ -403,6 +416,7 @@ export default function Player() {
         <Complete
           title={puzzle.title}
           elapsed={elapsed}
+          showTime={gp.timer}
           usedReveal={usedReveal}
           onClose={() => setShowComplete(false)}
         />

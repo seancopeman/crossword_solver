@@ -21,6 +21,13 @@ export interface ClueEntry {
   linked?: number[];
 }
 
+export interface Gameplay {
+  timer: boolean;
+  check: boolean;
+  reveal: boolean;
+  linkedClues: boolean;
+}
+
 export interface ExportedPuzzle {
   id: string;
   title: string;
@@ -39,6 +46,19 @@ export interface ExportedPuzzle {
   clues: {
     across: Record<number, ClueEntry>;
     down: Record<number, ClueEntry>;
+  };
+  /** Optional; absent on older puzzles → treat as all-on. */
+  showClueNumbers?: boolean;
+  gameplay?: Gameplay;
+}
+
+/** Resolve gameplay flags with back-compat defaults (all on except timer-honored). */
+export function resolveGameplay(p: ExportedPuzzle): Gameplay {
+  return {
+    timer: p.gameplay?.timer ?? true,
+    check: p.gameplay?.check ?? true,
+    reveal: p.gameplay?.reveal ?? true,
+    linkedClues: p.gameplay?.linkedClues ?? true,
   };
 }
 

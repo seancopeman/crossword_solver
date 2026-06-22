@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadIndex } from "../lib/data";
 import { loadProgress } from "../lib/progress";
+import { getInitialTheme, setTheme, type Theme } from "../lib/theme";
 import type { IndexEntry } from "../types";
 
 function fmtDate(iso: string): string {
@@ -27,6 +28,7 @@ function statusFor(id: string): "done" | "started" | "new" {
 export default function PuzzleList() {
   const [entries, setEntries] = useState<IndexEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [theme, setThemeState] = useState<Theme>(getInitialTheme());
 
   useEffect(() => {
     loadIndex()
@@ -34,9 +36,18 @@ export default function PuzzleList() {
       .catch((e) => setError(String(e)));
   }, []);
 
+  function toggleTheme() {
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    setThemeState(next);
+  }
+
   return (
     <div className="list-page">
       <header className="list-header">
+        <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle dark mode">
+          {theme === "dark" ? "☀" : "☾"}
+        </button>
         <h1>Crosswords</h1>
         <p className="subtitle">A little something, just for you ♥</p>
       </header>

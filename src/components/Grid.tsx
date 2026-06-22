@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { key } from "../lib/grid";
 import type { ExportedPuzzle } from "../types";
 
@@ -9,6 +9,7 @@ interface Props {
   marks: Record<string, "correct" | "wrong">;
   selected: { row: number; col: number } | null;
   wordKeys: Set<string>;
+  showNumbers?: boolean;
   onSelect: (row: number, col: number) => void;
 }
 
@@ -19,45 +20,68 @@ export default function Grid({
   marks,
   selected,
   wordKeys,
+  showNumbers = true,
   onSelect,
 }: Props) {
-  // Square cells sized to fit the viewport width; capped for big screens.
-  const cellPct = useMemo(() => 100 / puzzle.cols, [puzzle.cols]);
+  const fitRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+
+  // Measure the available area so the grid fits within both width and height.
+  useEffect(() => {
+    const el = fitRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const cr = entry.contentRect;
+      setBox({ w: cr.width, h: cr.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const cell = useMemo(() => {
+    const fit = Math.floor(Math.min(box.w / puzzle.cols, box.h / puzzle.rows));
+    return fit > 0 ? fit : 0;
+  }, [box, puzzle.cols, puzzle.rows]);
+
+  const gridW = cell * puzzle.cols;
 
   return (
-    <div
-      className="xw-grid"
-      style={{ gridTemplateColumns: `repeat(${puzzle.cols}, ${cellPct}%)` }}
-      role="grid"
-    >
-      {puzzle.grid.map((row, r) =>
-        row.map((cell, c) => {
-          const k = key(r, c);
-          if (cell.isBlack) return <div key={k} className="xw-cell black" role="gridcell" />;
-          const sel = selected?.row === r && selected?.col === c;
-          const cls = [
-            "xw-cell",
-            wordKeys.has(k) ? "in-word" : "",
-            sel ? "selected" : "",
-            revealed.has(k) ? "revealed" : "",
-            marks[k] === "wrong" ? "wrong" : "",
-            marks[k] === "correct" ? "correct" : "",
-          ]
-            .filter(Boolean)
-            .join(" ");
-          return (
-            <div
-              key={k}
-              className={cls}
-              role="gridcell"
-              onClick={() => onSelect(r, c)}
-            >
-              {cell.number !== undefined && <span className="num">{cell.number}</span>}
-              <span className="entry">{entries[k] ?? ""}</span>
-            </div>
-          );
-        })
-      )}
+    <div className="grid-fit" ref={fitRef}>
+      <div
+        className="xw-grid"
+        role="grid"
+        style={
+          {
+            width: gridW || "100%",
+            gridTemplateColumns: `repeat(${puzzle.cols}, 1fr)`,
+            ["--cell"]: `${cell}px`,
+          } as CSSProperties
+        }
+      >
+        {puzzle.grid.map((row, r) =>
+          row.map((c, ci) => {
+            const k = key(r, ci);
+            if (c.isBlack) return <div key={k} className="xw-cell black" role="gridcell" />;
+            const sel = selected?.row === r && selected?.col === ci;
+            const cls = [
+              "xw-cell",
+              wordKeys.has(k) ? "in-word" : "",
+              sel ? "selected" : "",
+              revealed.has(k) ? "revealed" : "",
+              marks[k] === "wrong" ? "wrong" : "",
+              marks[k] === "correct" ? "correct" : "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+            return (
+              <div key={k} className={cls} role="gridcell" onClick={() => onSelect(r, ci)}>
+                {showNumbers && c.number !== undefined && <span className="num">{c.number}</span>}
+                <span className="entry">{entries[k] ?? ""}</span>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
