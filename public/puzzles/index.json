@@ -1,6 +1,13 @@
 {
   "puzzles": [
     {
+      "id": "89c8a8d3-1c71-4997-bec0-f7d6467c21d4",
+      "title": "Sunday Skeleton (WIP)",
+      "publishDateTime": "2026-06-22T20:05:34.500Z",
+      "rows": 15,
+      "cols": 15
+    },
+    {
       "id": "22222222-2222-4222-8222-222222222222",
       "title": "Welcome Mini",
       "publishDateTime": "2026-06-01T09:00:00.000Z",
