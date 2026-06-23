@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { loadPuzzle } from "../lib/data";
 import {
@@ -12,10 +12,14 @@ import {
 } from "../lib/grid";
 import { clearProgress, loadProgress, saveProgress } from "../lib/progress";
 import { resolveGameplay, type Direction, type ExportedPuzzle } from "../types";
+import ClueList from "./ClueList";
 import Complete from "./Complete";
 import Grid from "./Grid";
 import Keyboard from "./Keyboard";
+import Milestone from "./Milestone";
 import Toolbar, { type Scope } from "./Toolbar";
+
+const MILESTONES = [25, 50, 75];
 
 interface ClueRef {
   num: number;
@@ -38,6 +42,33 @@ export default function Player() {
   const [usedReveal, setUsedReveal] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [showComplete, setShowComplete] = useState(false);
+  const [autoCheck, setAutoCheck] = useState(false);
+  const [showClues, setShowClues] = useState(false);
+  const [milestone, setMilestone] = useState<number | null>(null);
+  const shownMilestones = useRef<Set<number>>(new Set());
+  const milestoneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const whiteTotal = useMemo(() => (puzzle ? whiteKeys(puzzle).length : 0), [puzzle]);
+
+  const popMilestone = useCallback(
+    (nextEntries: Record<string, string>) => {
+      if (!puzzle || whiteTotal === 0) return;
+      const pct = (Object.keys(nextEntries).length / whiteTotal) * 100;
+      let toShow: number | null = null;
+      for (const t of MILESTONES) {
+        if (pct >= t && !shownMilestones.current.has(t)) {
+          shownMilestones.current.add(t);
+          toShow = t;
+        }
+      }
+      if (toShow !== null) {
+        setMilestone(toShow);
+        if (milestoneTimer.current) clearTimeout(milestoneTimer.current);
+        milestoneTimer.current = setTimeout(() => setMilestone(null), 1900);
+      }
+    },
+    [puzzle, whiteTotal]
+  );
 
   // --- load puzzle + saved progress ---
   useEffect(() => {
@@ -46,11 +77,16 @@ export default function Player() {
       .then((p) => {
         setPuzzle(p);
         const saved = loadProgress(id);
+        // Pre-seed milestones already passed so resuming doesn't re-toast.
+        shownMilestones.current = new Set();
         if (saved) {
           setEntries(saved.entries ?? {});
           setRevealed(new Set(saved.revealed ?? []));
           setElapsed(saved.elapsed ?? 0);
           setCompleted(!!saved.completedAt);
+          const white = whiteKeys(p).length;
+          const pct = white ? (Object.keys(saved.entries ?? {}).length / white) * 100 : 0;
+          for (const t of MILESTONES) if (pct >= t) shownMilestones.current.add(t);
         }
         // Select the first white cell of the first across word.
         const firstAcross = Object.keys(p.numbering.across).map(Number).sort((a, b) => a - b)[0];
@@ -163,12 +199,14 @@ export default function Player() {
       if (!puzzle || !selected || paused || completed || !active) return;
       const k = key(selected.row, selected.col);
       if (revealed.has(k)) return; // locked
-      const next = { ...entries, [k]: ch.toUpperCase() };
+      const letter = ch.toUpperCase();
+      const next = { ...entries, [k]: letter };
       setEntries(next);
       setMarks((m) => {
-        if (!(k in m)) return m;
-        const { [k]: _, ...rest } = m;
-        return rest;
+        const copy = { ...m };
+        if (autoCheck) copy[k] = letter === sol(selected.row, selected.col) ? "correct" : "wrong";
+        else delete copy[k];
+        return copy;
       });
       // Advance: next empty in word, else next cell in word.
       const idx = active.cells.findIndex((x) => x.row === selected.row && x.col === selected.col);
@@ -182,9 +220,10 @@ export default function Player() {
       }
       if (!target && idx + 1 < active.cells.length) target = active.cells[idx + 1];
       if (target) setSelected(target);
+      popMilestone(next);
       checkCompletion(next);
     },
-    [puzzle, selected, paused, completed, active, revealed, entries, checkCompletion]
+    [puzzle, selected, paused, completed, active, revealed, entries, autoCheck, sol, popMilestone, checkCompletion]
   );
 
   const del = useCallback(() => {
@@ -333,7 +372,26 @@ export default function Player() {
     setElapsed(0);
     setCompleted(false);
     setUsedReveal(false);
+    shownMilestones.current = new Set();
   }, [id]);
+
+  // Auto-check: when turned on, mark all currently filled cells; off clears marks.
+  const toggleAutoCheck = useCallback(() => {
+    setAutoCheck((on) => {
+      const next = !on;
+      if (next) {
+        const m: Record<string, "correct" | "wrong"> = {};
+        for (const k of Object.keys(entries)) {
+          const [r, c] = k.split(":").map(Number);
+          m[k] = entries[k] === sol(r, c) ? "correct" : "wrong";
+        }
+        setMarks(m);
+      } else {
+        setMarks({});
+      }
+      return next;
+    });
+  }, [entries, sol]);
 
   if (error)
     return (
@@ -362,6 +420,8 @@ export default function Player() {
           showTimer={gp.timer}
           showCheck={gp.check}
           showReveal={gp.reveal}
+          autoCheck={autoCheck}
+          onToggleAutoCheck={toggleAutoCheck}
           onTogglePause={() => setPaused((p) => !p)}
           onCheck={doCheck}
           onReveal={doReveal}
@@ -408,9 +468,24 @@ export default function Player() {
         <button className="arrow" onClick={() => stepClue(1)} aria-label="Next clue">
           ›
         </button>
+        <button className="cl-open" onClick={() => setShowClues(true)} aria-label="All clues">
+          ☰
+        </button>
       </div>
 
       <Keyboard onKey={typeLetter} onDelete={del} onEnter={() => stepClue(1)} />
+
+      {milestone !== null && <Milestone percent={milestone} />}
+
+      {showClues && (
+        <ClueList
+          puzzle={puzzle}
+          activeNum={active?.num ?? null}
+          activeDir={active?.dir ?? null}
+          onPick={(n, d) => gotoClue({ num: n, dir: d })}
+          onClose={() => setShowClues(false)}
+        />
+      )}
 
       {showComplete && (
         <Complete
@@ -418,6 +493,7 @@ export default function Player() {
           elapsed={elapsed}
           showTime={gp.timer}
           usedReveal={usedReveal}
+          message={puzzle.message}
           onClose={() => setShowComplete(false)}
         />
       )}

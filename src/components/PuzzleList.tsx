@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { loadIndex } from "../lib/data";
 import { loadProgress } from "../lib/progress";
 import { getInitialTheme, setTheme, type Theme } from "../lib/theme";
-import type { IndexEntry } from "../types";
+import { whiteCountFromLayout, type IndexEntry } from "../types";
+import Thumbnail from "./Thumbnail";
 
 function fmtDate(iso: string): string {
   try {
@@ -18,11 +19,20 @@ function fmtDate(iso: string): string {
   }
 }
 
-function statusFor(id: string): "done" | "started" | "new" {
-  const p = loadProgress(id);
-  if (!p) return "new";
-  if (p.completedAt) return "done";
-  return Object.keys(p.entries).length > 0 ? "started" : "new";
+interface Progress {
+  done: boolean;
+  /** 0–100, or null when we can't compute it (no layout). */
+  percent: number | null;
+}
+
+function progressFor(entry: IndexEntry): Progress {
+  const p = loadProgress(entry.id);
+  if (!p) return { done: false, percent: entry.layout ? 0 : null };
+  if (p.completedAt) return { done: true, percent: 100 };
+  const white = whiteCountFromLayout(entry.layout);
+  const filled = Object.keys(p.entries).length;
+  const percent = white > 0 ? Math.min(100, Math.round((filled / white) * 100)) : null;
+  return { done: false, percent };
 }
 
 export default function PuzzleList() {
@@ -45,9 +55,14 @@ export default function PuzzleList() {
   return (
     <div className="list-page">
       <header className="list-header">
-        <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle dark mode">
-          {theme === "dark" ? "☀" : "☾"}
-        </button>
+        <div className="header-actions">
+          <Link className="stats-link" to="/stats" aria-label="Statistics">
+            📊
+          </Link>
+          <button className="theme-toggle" onClick={toggleTheme} aria-label="Toggle dark mode">
+            {theme === "dark" ? "☀" : "☾"}
+          </button>
+        </div>
         <h1>Crosswords</h1>
         <p className="subtitle">A little something, just for you ♥</p>
       </header>
@@ -60,20 +75,33 @@ export default function PuzzleList() {
 
       <ul className="puzzle-list">
         {entries?.map((p) => {
-          const st = statusFor(p.id);
+          const pr = progressFor(p);
           return (
             <li key={p.id}>
               <Link to={`/play/${p.id}`} className="puzzle-item">
+                {p.layout ? (
+                  <Thumbnail layout={p.layout} rows={p.rows} cols={p.cols} />
+                ) : (
+                  <div className="thumb-placeholder">
+                    {p.rows}×{p.cols}
+                  </div>
+                )}
                 <div className="pi-main">
                   <span className="pi-title">{p.title}</span>
                   <span className="pi-date">{fmtDate(p.publishDateTime)}</span>
                 </div>
                 <div className="pi-side">
-                  <span className="pi-size">
-                    {p.rows}×{p.cols}
-                  </span>
-                  {st === "done" && <span className="badge done">Solved ✓</span>}
-                  {st === "started" && <span className="badge started">In progress</span>}
+                  {pr.done ? (
+                    <span className="badge done">Solved ✓</span>
+                  ) : pr.percent !== null && pr.percent > 0 ? (
+                    <>
+                      <div className="ring" style={{ ["--pct" as string]: pr.percent }}>
+                        <span>{pr.percent}%</span>
+                      </div>
+                    </>
+                  ) : (
+                    <span className="pi-size">{p.rows}×{p.cols}</span>
+                  )}
                 </div>
               </Link>
             </li>

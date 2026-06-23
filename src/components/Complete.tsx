@@ -5,6 +5,7 @@ interface Props {
   elapsed: number;
   showTime?: boolean;
   usedReveal: boolean;
+  message?: string;
   onClose: () => void;
 }
 
@@ -14,7 +15,7 @@ function fmt(elapsed: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export default function Complete({ title, elapsed, showTime = true, usedReveal, onClose }: Props) {
+export default function Complete({ title, elapsed, showTime = true, usedReveal, message, onClose }: Props) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="complete" onClick={(e) => e.stopPropagation()}>
@@ -27,6 +28,7 @@ export default function Complete({ title, elapsed, showTime = true, usedReveal, 
           </p>
         )}
         {usedReveal && <p className="chint">(with a little help from Reveal)</p>}
+        {message && message.trim() && <p className="cmessage">{message}</p>}
         <div className="cactions">
           <button className="tb-btn" onClick={onClose}>
             Keep looking

@@ -12,7 +12,8 @@
       "title": "Welcome Mini",
       "publishDateTime": "2026-06-01T09:00:00.000Z",
       "rows": 5,
-      "cols": 5
+      "cols": 5,
+      "layout": "........................."
     }
   ]
 }

@@ -32,6 +32,8 @@ export interface ExportedPuzzle {
   id: string;
   title: string;
   themeNotes?: string;
+  /** A personal note shown on completion. */
+  message?: string;
   publishDateTime: string;
   status: "draft" | "scheduled" | "published" | "archived";
   createdAt: string;
@@ -69,8 +71,18 @@ export interface IndexEntry {
   publishDateTime: string;
   rows: number;
   cols: number;
+  /** Row-major block map ('#'/'.'). Absent on older index files. */
+  layout?: string;
 }
 
 export interface PuzzleIndex {
   puzzles: IndexEntry[];
+}
+
+/** Number of white (playable) cells from a layout string. */
+export function whiteCountFromLayout(layout?: string): number {
+  if (!layout) return 0;
+  let n = 0;
+  for (const ch of layout) if (ch === ".") n++;
+  return n;
 }

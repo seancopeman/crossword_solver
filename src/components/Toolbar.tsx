@@ -8,6 +8,8 @@ interface Props {
   showTimer?: boolean;
   showCheck?: boolean;
   showReveal?: boolean;
+  autoCheck?: boolean;
+  onToggleAutoCheck?: () => void;
   onTogglePause: () => void;
   onCheck: (scope: Scope) => void;
   onReveal: (scope: Scope) => void;
@@ -27,6 +29,8 @@ export default function Toolbar({
   showTimer = true,
   showCheck = true,
   showReveal = true,
+  autoCheck = false,
+  onToggleAutoCheck,
   onTogglePause,
   onCheck,
   onReveal,
@@ -85,6 +89,11 @@ export default function Toolbar({
         </button>
         {menu === "more" && (
           <div className="menu">
+            {showCheck && onToggleAutoCheck && (
+              <button onClick={() => { onToggleAutoCheck(); close(); }}>
+                Auto-check: {autoCheck ? "On" : "Off"}
+              </button>
+            )}
             <button className="danger" onClick={() => { onReset(); close(); }}>
               Reset puzzle
             </button>
